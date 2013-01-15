@@ -5,6 +5,8 @@
 #include <linux/compiler.h>
 #include <asm/swab.h>
 
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+
 /*
  * casts are necessary for constants, because we never know how for sure
  * how U/UL/ULL map to __u16, __u32, __u64. At least not in a portable way.
