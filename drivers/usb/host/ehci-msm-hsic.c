@@ -865,9 +865,7 @@ static void msm_hsic_clk_reset(struct msm_hsic_hcd *mehci)
 #define HSIC_CAL_PAD_CTL       (MSM_TLMM_BASE+0x20C8)
 #define HSIC_LV_MODE		0x04
 #define HSIC_PAD_CALIBRATION	0xA8
-/* +SSD_RIL: change the PAD value from 0x0A0AAA10 to 0x0A1EBE10 according to simulation result */
-#define HSIC_GPIO_PAD_VAL	0x0A1EBE10
-/* -SSD_RIL */
+#define HSIC_GPIO_PAD_VAL	0x0A0AAA10
 #define LINK_RESET_TIMEOUT_USEC		(250 * 1000)
 
 static void msm_hsic_phy_reset(struct msm_hsic_hcd *mehci)
@@ -949,7 +947,7 @@ static int msm_hsic_reset(struct msm_hsic_hcd *mehci)
 {
 	/* reset HSIC phy */
 	msm_hsic_phy_reset(mehci);
-	
+
 	/* HSIC init procedure (caliberation) */
 	return msm_hsic_start(mehci);
 }
@@ -960,10 +958,6 @@ static int msm_hsic_suspend(struct msm_hsic_hcd *mehci)
 	int cnt = 0, ret;
 	u32 val;
 	int none_vol, max_vol;
-#ifdef HTC_PM_DBG
-	unsigned long  elapsed_ms = 0;
-	static unsigned int suspend_cnt = 0;
-#endif
 	struct msm_hsic_host_platform_data *pdata = mehci->dev->platform_data;
 
 	if (atomic_read(&mehci->in_lpm)) {
@@ -1032,8 +1026,8 @@ static int msm_hsic_suspend(struct msm_hsic_hcd *mehci)
 		dev_err(mehci->dev, "unable to set vddcx voltage for VDD MIN\n");
 
 	if (mehci->bus_perf_client && debug_bus_voting_enabled) {
-			mehci->bus_vote = false;
-			queue_work(ehci_wq, &mehci->bus_vote_w);
+		mehci->bus_vote = false;
+		queue_work(ehci_wq, &mehci->bus_vote_w);
 	}
 
 	atomic_set(&mehci->in_lpm, 1);
@@ -1047,24 +1041,6 @@ static int msm_hsic_suspend(struct msm_hsic_hcd *mehci)
 		pm_qos_update_request(&mehci->pm_qos_req_dma,
 			PM_QOS_DEFAULT_VALUE);
 
-	/* ++SSD_RIL */
-#ifdef HTC_PM_DBG
-	if (usb_pm_debug_enabled) {
-		if (mdm_hsic_phy_resume_jiffies != 0) {
-			elapsed_ms = jiffies_to_msecs(jiffies - mdm_hsic_phy_resume_jiffies);
-			mdm_hsic_phy_active_total_ms += elapsed_ms ;
-			LOG_WITH_TIMESTAMP("%s elapsed_ms: %lu ms, total: %lu", __func__, elapsed_ms, mdm_hsic_phy_active_total_ms);
-		}
-		suspend_cnt++;
-		if (elapsed_ms > 30000 || suspend_cnt >= 10) {
-			suspend_cnt = 0;
-			mdm_hsic_print_pm_info();
-		}
-	}
-#endif
-	if (usb_device_recongnized)
-		cancel_delayed_work(&mdm_hsic_pm_monitor_delayed_work);
-	/* --SSD_RIL */
 	wake_unlock(&mehci->wlock);
 
 	dev_dbg(mehci->dev, "HSIC-USB in low power mode\n");
@@ -1099,17 +1075,10 @@ static int msm_hsic_resume(struct msm_hsic_hcd *mehci)
 	spin_unlock_irqrestore(&mehci->wakeup_lock, flags);
 
 	wake_lock(&mehci->wlock);
-	/* ++SSD_RIL */
-	/* ++SSD_RIL */
-	mdm_hsic_phy_resume_jiffies = jiffies;
-	/* --SSD_RIL */
-	if (usb_device_recongnized)
-		schedule_delayed_work(&mdm_hsic_pm_monitor_delayed_work, msecs_to_jiffies(HSIC_PM_MON_DELAY));
-	/* --SSD_RIL */
 
 	if (mehci->bus_perf_client && debug_bus_voting_enabled) {
-			mehci->bus_vote = true;
-			queue_work(ehci_wq, &mehci->bus_vote_w);
+		mehci->bus_vote = true;
+		queue_work(ehci_wq, &mehci->bus_vote_w);
 	}
 
 	min_vol = vdd_val[mehci->vdd_type][VDD_MIN];
